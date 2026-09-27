@@ -5,6 +5,7 @@ import pytest
 
 
 CONTRACT = "contracts/versionwake.py"
+DIRECT_MODE_GENVM_VERSION = "v0.2.12"
 BASELINE_URL = "https://baseline.example.org/releases/v1.txt"
 NOTICE_URL = "https://notices.example.net/releases/v1.txt"
 BASELINE = b"Widget API v1 supports the legacy submit(record) method."
@@ -21,7 +22,7 @@ def digest(raw):
 def deploy(direct_vm, direct_deploy, direct_alice):
     direct_vm.sender = direct_alice
     direct_vm.check_pickling = True
-    return direct_deploy(CONTRACT)
+    return direct_deploy(CONTRACT, sdk_version=DIRECT_MODE_GENVM_VERSION)
 
 
 def submit(contract, notice_id="notice-1", summary=SUMMARY, baseline=BASELINE, notice=NOTICE):
