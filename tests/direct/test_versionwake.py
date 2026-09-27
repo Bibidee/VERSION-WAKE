@@ -54,7 +54,7 @@ def test_valid_proposal_is_namespaced_and_readable(direct_vm, direct_deploy, dir
     submit(contract)
     row = contract.get_notice("notice-1", direct_alice)
     assert row["status"] == "pending"
-    assert row["proposer"].lower() == direct_alice.as_hex.lower()
+    assert row["proposer"].lower() == ("0x" + direct_alice.hex()).lower()
     assert row["baseline_hash"] == digest(BASELINE)
     assert row["notice_hash"] == digest(NOTICE)
     assert row["confidence"] == 0

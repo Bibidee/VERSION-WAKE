@@ -99,6 +99,12 @@ def content_sha256(raw: bytes) -> str:
     return "0x" + hashlib.sha256(raw).hexdigest()
 
 
+def canonical_address_hex(value) -> str:
+    if isinstance(value, bytes):
+        return "0x" + value.hex()
+    return value.as_hex.lower()
+
+
 def valid_https_domain_url(value: str, label: str) -> str:
     result = str(value).strip()
     if len(result) == 0 or len(result) > MAX_URL or not result.startswith("https://"):
@@ -268,7 +274,7 @@ class Versionwake(gl.Contract):
         self.notice_count = u256(0)
 
     def _key(self, notice_id: str, proposer: Address) -> str:
-        return proposer.as_hex.lower() + ":" + notice_id
+        return canonical_address_hex(proposer) + ":" + notice_id
 
     def _require_notice(self, notice_id: str, proposer: Address) -> ChangeNotice:
         normalized_id = valid_id(notice_id)
@@ -396,7 +402,7 @@ class Versionwake(gl.Contract):
             "notice_url": str(notice.notice_url),
             "notice_hash": str(notice.notice_hash),
             "summary": str(notice.summary),
-            "proposer": notice.proposer.as_hex,
+            "proposer": canonical_address_hex(notice.proposer),
             "status": str(notice.status),
             "outcome": str(notice.outcome),
             "target_match": str(notice.target_match),
