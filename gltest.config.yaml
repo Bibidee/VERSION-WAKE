@@ -1,0 +1,9 @@
+networks:
+  default: studionet
+  studionet:
+    # Direct Mode is the default release gate; StudioNet is configured only for later live work.
+    url: "https://studio.genlayer.com/api"
+
+paths:
+  contracts: "contracts"
+  artifacts: "artifacts"
