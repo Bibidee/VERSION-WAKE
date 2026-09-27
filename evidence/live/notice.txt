@@ -1,0 +1,1 @@
+Controlled Versionwake lifecycle fixture VWK-LIVE-001. Example Widget SDK version 1.0 deprecates GET /v1/status and schedules its removal for 2025-01-01.
