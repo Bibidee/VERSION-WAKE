@@ -41,12 +41,14 @@ def submit(contract, notice_id="notice-1", summary=SUMMARY, baseline=BASELINE, n
 def install_review_mocks(direct_vm, result=None, baseline=BASELINE, notice=NOTICE, baseline_status=200, notice_status=200):
     direct_vm.mock_web(r"baseline\.example\.org/releases/v1\.txt", {"status": baseline_status, "body": baseline})
     direct_vm.mock_web(r"notices\.example\.net/releases/v1\.txt", {"status": notice_status, "body": notice})
-    direct_vm.mock_llm(r"Return a JSON object with exactly these keys", json.dumps(result or {
-        "target_match": "yes",
-        "change_kind": "deprecation",
-        "confidence": 91,
-        "rationale": "The notice names the pinned API version and explicitly says the method is deprecated.",
-    }))
+    if result is None:
+        result = {
+            "target_match": "yes",
+            "change_kind": "deprecation",
+            "confidence": 91,
+            "rationale": "The notice names the pinned API version and explicitly says the method is deprecated.",
+        }
+    direct_vm.mock_llm(r"Return a JSON object with exactly these keys", json.dumps(result))
 
 
 def test_valid_proposal_is_namespaced_and_readable(direct_vm, direct_deploy, direct_alice, direct_bob):
