@@ -140,10 +140,46 @@ def test_get_info_reports_version_and_protocol_bounds(direct_vm, direct_deploy, 
     contract = deploy(direct_vm, direct_deploy, direct_alice)
     info = contract.get_info()
     assert info["name"] == "Versionwake"
-    assert info["version"] == "0.1.1"
-    assert info["max_notices"] == 512
+    assert info["version"] == "0.2.0"
+    assert info["max_notices_per_proposer_lifetime"] == 64
     assert info["max_artifact_bytes"] == 16000
     assert info["minimum_confidence"] == 75
+
+
+def test_lifetime_capacity_is_isolated_by_proposer_and_keeps_terminal_history(direct_vm, direct_deploy, direct_alice, direct_bob):
+    contract = deploy(direct_vm, direct_deploy, direct_alice)
+    for index in range(64):
+        submit(contract, notice_id=f"notice-{index}")
+    assert contract.get_proposer_notice_count(direct_alice) == 64
+
+    install_review_mocks(direct_vm)
+    contract.review_notice("notice-0", direct_alice)
+    contract.cancel_notice("notice-1")
+    assert contract.get_notice("notice-0", direct_alice)["status"] == "confirmed"
+    assert contract.get_notice("notice-1", direct_alice)["status"] == "cancelled"
+    assert contract.get_proposer_notice_count(direct_alice) == 64
+
+    with direct_vm.expect_revert("proposer capacity reached"):
+        submit(contract, notice_id="notice-64")
+
+    # Reaching one account's cap does not consume another account's quota;
+    # proposer-scoped IDs also allow an independent second record with the same ID.
+    with direct_vm.prank(direct_bob):
+        submit(contract, notice_id="notice-0")
+    assert contract.get_notice("notice-0", direct_bob)["status"] == "pending"
+    assert contract.get_proposer_notice_count(direct_bob) == 1
+
+
+def test_per_proposer_capacity_boundary_has_no_decrement_or_overflow_path(direct_vm, direct_deploy, direct_alice):
+    contract = deploy(direct_vm, direct_deploy, direct_alice)
+    for index in range(63):
+        submit(contract, notice_id=f"boundary-{index}")
+    assert contract.get_proposer_notice_count(direct_alice) == 63
+    submit(contract, notice_id="boundary-63")
+    assert contract.get_proposer_notice_count(direct_alice) == 64
+    with direct_vm.expect_revert("proposer capacity reached"):
+        submit(contract, notice_id="boundary-overflow")
+    assert contract.get_proposer_notice_count(direct_alice) == 64
 
 
 def test_review_hash_verifies_both_documents_and_confirms_deprecation(direct_vm, direct_deploy, direct_alice):

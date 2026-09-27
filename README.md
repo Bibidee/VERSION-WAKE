@@ -1,8 +1,8 @@
 # Versionwake
 
-Versionwake is a standalone GenLayer Intelligent Contract primitive for recording and independently classifying hash-committed upstream change notices against a specific dependency or standard version. It is aimed at release systems and downstream Intelligent Contracts that need an auditable signal when a notice says a pinned API, protocol, or specification version is breaking, deprecated, or scheduled for removal.
+Versionwake is a standalone GenLayer Intelligent Contract primitive for recording and independently classifying hash-committed upstream change notices against a specific dependency or standard version. It is aimed at release systems and downstream Intelligent Contracts that need an auditable signal when a notice says a pinned API, protocol, or specification version is breaking, deprecated, or scheduled for removal. The repository also includes VersionGuard, an optional but integrated downstream policy contract that consumes Versionwake's exact-scope confirmed result and records a deterministic migration/review consequence.
 
-It is contract-only: there is no frontend, token, escrow, trusted decision service, or claim that a caller's publisher label proves real-world authority.
+It is contract-only: there is no frontend, token, escrow, trusted decision service, or claim that a caller's publisher label proves real-world authority. Versionwake remains independently usable; VersionGuard is a separate, opt-in integration for protocols that want a deterministic on-chain reaction.
 
 ## Why GenLayer?
 
@@ -11,6 +11,39 @@ A deterministic contract can verify that downloaded bytes match a SHA-256 commit
 The reviewers compare `target_match`, `change_kind`, and the derived outcome. Rationale and exact confidence values are diagnostic rather than consensus-critical; crossing the fixed confidence threshold changes the derived outcome and therefore fails equivalence. Different categories or outcomes disagree. A malformed model response is never accepted as an analysis: its validator returns disagreement so GenLayer can rotate execution rather than committing an invented verdict. Source unavailability is retryable; integrity failures never authorize a change.
 
 Without GenLayer, an application could still fetch and hash the documents, but would normally rely on one server or one model call to decide applicability and impact. That service could selectively classify notices. Versionwake places the semantic judgment and its explicit equivalence rule in the consensus execution path. This reduces single-operator dependence; it does not prove that an artifact publisher is authentic or that every validator is infallible.
+
+## Architecture and downstream consequence
+
+```text
+commit-pinned baseline + notice
+              |
+              v
+Versionwake: each validator fetches and hashes both artifacts, independently classifies
+              |
+              v
+consensus-backed exact-scope result: proposer + notice ID + subject + pinned version
+              |
+              v
+VersionGuard: policy owner selects registry + trusted proposer + dependency scope
+              |
+              v
+active -> review_required | migration_required
+```
+
+Versionwake owns artifact integrity, independent observation, semantic classification, equivalence, and the immutable result record. VersionGuard owns the consuming application's trust policy, dependency snapshot, replay marker, and deterministic response. It does not make another model call.
+
+A policy owner explicitly registers a `policy_id`, dependency subject, pinned version, Versionwake contract address, and trusted proposer address. Anyone may call `apply_notice(owner, policy_id, notice_id)`, but the call can transition the policy only if the configured Versionwake contract reports that exact notice as `confirmed` for that exact proposer, subject, and pinned version, the exact-scope view gate returns true, and the material-change confidence threshold is met. A breaking change sets `migration_required`; deprecation or sunset sets `review_required`. A notice can be applied once, and the resulting policy state is terminal. A new dependency pin is represented by a new policy ID; neither contract provides an owner reset or arbitrary history deletion.
+
+Example downstream gate:
+
+```python
+# Another Intelligent Contract may gate an upgrade or privileged operation:
+policy = version_guard.get_policy(policy_id, policy_owner)
+if policy["state"] == "migration_required":
+    raise gl.vm.UserError("Dependency migration is required before this operation")
+```
+
+The caller must use the policy owner's namespace and follow its own access-control rules. VersionGuard is not an identity system: its configured trusted proposer is an explicit address choice, not proof that an address represents a real publisher.
 
 ## Lifecycle
 
@@ -51,7 +84,7 @@ if not versionwake.is_confirmed_for(notice_id, notice_submitter, package, pinned
 - An unavailable source or LLM does not become `confirmed`; it leaves the record pending/retryable. Hash mismatch and malformed content also cannot authorize a notice.
 - Evidence is immutable only by its hash commitment. External hosts can disappear or serve different bytes; replacement bytes fail verification.
 - The publisher/authority of the evidence is not authenticated by this contract. Integrators must establish their own trust policy for sources and submitters.
-- Capacity is bounded to 512 records per deployment and is a lifetime limit; records are retained for auditability.
+- Versionwake allows at most 64 lifetime submissions per proposer address. Terminal records remain stored and continue to count; cancellation/finalization does not reclaim a slot, preserving history without deletion authority. This isolates one address's quota but is not Sybil resistance: multiple controlled addresses have independent quotas, and the design does not claim a strict global storage ceiling. VersionGuard separately permits 64 lifetime policies per owner address, retaining terminal policies and without a reset/delete path.
 - Consensus disagreement, provider variability, or prolonged infrastructure failure can prevent a review from finalizing. No contract can promise zero `UNDETERMINED` outcomes; the safe property is that uncertainty never becomes a confirmed change.
 - Versionwake does not fetch continuously. It classifies the exact two artifacts submitted for one record, not the current state of the entire internet.
 
@@ -65,13 +98,15 @@ python scripts/preflight.py
 python -m pytest tests/direct -q
 genvm-lint check contracts/versionwake.py --json
 genvm-lint schema contracts/versionwake.py --output artifacts/versionwake.abi.json
+genvm-lint check contracts/version_guard.py --json
+genvm-lint schema contracts/version_guard.py --output artifacts/version_guard.abi.json
 ```
 
-The preflight fails if a required tool, test, linter, or schema step is missing or failing. Tests live outside `contracts/`; only `contracts/versionwake.py` is deployable. A failed release gate means **do not freeze or deploy**; fix the root cause and rerun every gate.
+The preflight fails if a required tool, test, linter, or schema step is missing or failing. Tests live outside `contracts/`; the only deployable sources are `contracts/versionwake.py` and `contracts/version_guard.py`. A failed release gate means **do not freeze or deploy**; fix the root cause and rerun every gate.
 
-## Studionet deployment
+## Historical deployment — Versionwake v0.1.1 (superseded)
 
-The current deployment is Versionwake v0.1.1 at frozen source commit `e3d756184e18e75b4f984cc0af3202e5d5c3c827`. Its deployment transaction finalized with `MAJORITY_AGREE` and leader GenVM `SUCCESS`.
+This is the last deployed Versionwake source before the current v0.2.0 / VersionGuard source changes. Do not treat this as the current release or as a deployment of VersionGuard.
 
 - Contract: [`0xfaC85C5728F57b53B2973add5A14C24F7A45268d`](https://explorer-studio.genlayer.com/address/0xfaC85C5728F57b53B2973add5A14C24F7A45268d)
 - Deployment transaction: [`0x0c9f55e00dc657da265f636d97ac77eb81dc520f686cb645fc583e4942698c99`](https://explorer-studio.genlayer.com/tx/0x0c9f55e00dc657da265f636d97ac77eb81dc520f686cb645fc583e4942698c99)
@@ -80,7 +115,7 @@ The current deployment is Versionwake v0.1.1 at frozen source commit `e3d756184e
 - `get_info()` returned name `Versionwake`, version `0.1.1`, maximum 512 notices, maximum artifact size 16,000 bytes, and minimum confidence 75.
 - Release gate: GitHub Actions run [36322467965](https://github.com/Bibidee/VERSION-WAKE/actions/runs/36322467965) passed; all 61 Direct Mode tests passed, followed by GenVM lint and schema generation.
 
-### Live lifecycle evidence
+### Historical live lifecycle evidence — v0.1.1
 
 This controlled fixture demonstrates the full submitted-notice review path. It is intentionally a contract fixture, not a claim about a real third-party SDK.
 
@@ -93,9 +128,13 @@ This controlled fixture demonstrates the full submitted-notice review path. It i
 - Canonical reviewed state: `confirmed`, `target_match=yes`, `change_kind=sunset`, confidence `95`; rationale: “The notice explicitly names Example Widget SDK version 1.0, matching the subject and pinned version, and states that GET /v1/status is deprecated with a scheduled removal date of 2025-01-01, which is a scheduled removal (sunset) relative to the baseline where the endpoint was supported.”
 - The exact-scope `is_confirmed_for` gate returned `true` when queried with typed GenLayerJS arguments.
 
-### Superseded v0.1.0 deployment
+### Historical / superseded v0.1.0 deployment
 
 The earlier v0.1.0 deployment [`0xC85F766E74c77638E70859a417d01b799726Eb7E`](https://explorer-studio.genlayer.com/address/0xC85F766E74c77638E70859a417d01b799726Eb7E), transaction [`0x79eec415ef9e96903b211bab2fc35d672bd2d0a4d099c22f2a87ba4c82203bf5`](https://explorer-studio.genlayer.com/tx/0x79eec415ef9e96903b211bab2fc35d672bd2d0a4d099c22f2a87ba4c82203bf5), is historical and superseded. Its live review [`0xe2efe0ed00090b6dfb1018a8eb10be05c0b87ef9344764a533a720992d0b6742`](https://explorer-studio.genlayer.com/tx/0xe2efe0ed00090b6dfb1018a8eb10be05c0b87ef9344764a533a720992d0b6742) finalized with a GenVM event-encoding error at `NoticeReviewed.emit()` (`SystemError: 2: inval`); its notice remained pending. v0.1.1 bounds the event's positional fields and keeps the diagnostic category in the event blob.
+
+## Current source release status
+
+Versionwake v0.2.0 and VersionGuard v0.1.0 are source changes relative to the historical deployment above. They are not represented as deployed until their exact source commits are deployed on Studionet chain 61999, finalized, and their deployed source is checked for byte-for-byte parity. The release process must separately record each deployment and a real two-contract lifecycle; simulator evidence is not live-chain evidence.
 
 ## References
 

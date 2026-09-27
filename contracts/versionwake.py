@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from genlayer import *
 
 
-VERSION = "0.1.1"
+VERSION = "0.2.0"
 PENDING = "pending"
 CONFIRMED = "confirmed"
 NO_MATERIAL_CHANGE = "no_material_change"
@@ -21,7 +21,7 @@ RETRYABLE = "retryable"
 INVALID_ARTIFACT = "invalid_artifact"
 MALFORMED = "malformed"
 
-MAX_NOTICES = 512
+MAX_NOTICES_PER_PROPOSER = 64
 MAX_ID = 96
 MAX_SUBJECT = 160
 MAX_VERSION = 96
@@ -271,10 +271,10 @@ Do not infer authority from the submitter's summary. Do not treat a document as 
 
 class Versionwake(gl.Contract):
     notices: TreeMap[str, ChangeNotice]
-    notice_count: u256
+    proposer_notice_counts: TreeMap[str, u256]
 
     def __init__(self):
-        self.notice_count = u256(0)
+        pass
 
     def _key(self, notice_id: str, proposer: Address) -> str:
         return canonical_address_hex(proposer) + ":" + notice_id
@@ -301,8 +301,13 @@ class Versionwake(gl.Contract):
         normalized_id = valid_id(notice_id)
         proposer = gl.message.sender_address
         key = self._key(normalized_id, proposer)
-        if self.notices.get(key) is not None or int(self.notice_count) >= MAX_NOTICES:
-            raise gl.vm.UserError("[EXPECTED] Notice unavailable or capacity reached")
+        proposer_key = canonical_address_hex(proposer)
+        used = self.proposer_notice_counts.get(proposer_key)
+        used_count = int(used) if used is not None else 0
+        if self.notices.get(key) is not None:
+            raise gl.vm.UserError("[EXPECTED] Notice unavailable or proposer capacity reached")
+        if used_count >= MAX_NOTICES_PER_PROPOSER:
+            raise gl.vm.UserError("[EXPECTED] Notice unavailable or proposer capacity reached")
         subject_value = bounded_text(subject, "subject", MAX_SUBJECT)
         version_value = bounded_text(version_ref, "version_ref", MAX_VERSION)
         summary_value = bounded_text(summary, "summary", MAX_SUMMARY)
@@ -332,7 +337,7 @@ class Versionwake(gl.Contract):
             now,
             u256(0),
         )
-        self.notice_count = u256(int(self.notice_count) + 1)
+        self.proposer_notice_counts[proposer_key] = u256(used_count + 1)
         NoticeSubmitted(normalized_id, proposer, subject_value).emit()
 
     @gl.public.write
@@ -436,8 +441,13 @@ class Versionwake(gl.Contract):
             "name": "Versionwake",
             "version": VERSION,
             "purpose": "Hash-bound semantic upstream change-notice classification",
-            "max_notices": MAX_NOTICES,
+            "max_notices_per_proposer_lifetime": MAX_NOTICES_PER_PROPOSER,
             "max_artifact_bytes": MAX_ARTIFACT_BYTES,
             "minimum_confidence": MIN_CONFIDENCE,
             "statuses": [PENDING, CONFIRMED, NO_MATERIAL_CHANGE, NOT_APPLICABLE, INCONCLUSIVE, CANCELLED],
         }
+
+    @gl.public.view
+    def get_proposer_notice_count(self, proposer: Address) -> int:
+        count = self.proposer_notice_counts.get(canonical_address_hex(proposer))
+        return int(count) if count is not None else 0

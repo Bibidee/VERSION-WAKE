@@ -1,4 +1,4 @@
-"""Run the full local release gate for the sole Versionwake contract."""
+"""Run all contract checks, Direct Mode tests, lint, and schemas."""
 
 import ast
 import json
@@ -11,10 +11,34 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PINNED_GENVM_RELEASE = "v0.2.12"
-os.environ.setdefault("GENVM_VERSION", PINNED_GENVM_RELEASE)
+os.environ["GENVM_VERSION"] = PINNED_GENVM_RELEASE
 CONTRACT_DIR = ROOT / "contracts"
-CONTRACTS = sorted(CONTRACT_DIR.glob("*.py"))
-CONTRACT = CONTRACT_DIR / "versionwake.py"
+CONTRACT_SOURCES = {
+    "versionwake.py": {
+        '"Depends": "py-genlayer:',
+        "class Versionwake(gl.Contract):",
+        "class ChangeNotice:",
+        "def canonical_sha256(value:",
+        "def fetch_verified(source_url:",
+        "gl.nondet.web.get(source_url)",
+        'gl.nondet.exec_prompt(prompt, response_format="json")',
+        "gl.vm.run_nondet_unsafe(leader, validator)",
+        "MIN_CONFIDENCE = 75",
+        "MAX_NOTICES_PER_PROPOSER = 64",
+        "proposer_notice_counts: TreeMap[str, u256]",
+        "def get_proposer_notice_count(",
+    },
+    "version_guard.py": {
+        '"Depends": "py-genlayer:',
+        "class VersionGuard(gl.Contract):",
+        "class DependencyPolicy:",
+        "class VersionwakeRegistry:",
+        "gl.public.write",
+        "def apply_notice(",
+        "registry.is_confirmed_for(",
+        "MAX_POLICIES_PER_OWNER_LIFETIME = 64",
+    },
+}
 
 
 def run(command: list[str]) -> None:
@@ -24,28 +48,22 @@ def run(command: list[str]) -> None:
         raise SystemExit(result.returncode)
 
 
-if len(CONTRACTS) != 1 or CONTRACTS[0] != CONTRACT:
-    raise SystemExit("Release gate requires exactly one deployable source: contracts/versionwake.py")
+actual_names = {path.relative_to(CONTRACT_DIR).as_posix() for path in CONTRACT_DIR.rglob("*.py")}
+if actual_names != set(CONTRACT_SOURCES):
+    raise SystemExit(
+        "Deployable source inventory mismatch; expected exactly "
+        f"{sorted(CONTRACT_SOURCES)}, got {sorted(actual_names)}"
+    )
 
-source = CONTRACT.read_text(encoding="utf-8")
-ast.parse(source, filename=str(CONTRACT))
-required_invariants = (
-    '"Depends": "py-genlayer:',
-    "class Versionwake(gl.Contract):",
-    "class ChangeNotice:",
-    "def canonical_sha256(value:",
-    "def fetch_verified(source_url:",
-    "gl.nondet.web.get(source_url)",
-    'gl.nondet.exec_prompt(prompt, response_format="json")',
-    "gl.vm.run_nondet_unsafe(leader, validator)",
-    "MIN_CONFIDENCE = 75",
-    "MAX_NOTICES = 512",
-)
-missing = [token for token in required_invariants if token not in source]
-if missing:
-    raise SystemExit(f"Required contract invariants are missing: {missing}")
-if "import pytest" in source or "from pytest" in source:
-    raise SystemExit("Test dependencies must not appear in deployable contract source")
+for name, invariants in CONTRACT_SOURCES.items():
+    contract = CONTRACT_DIR / name
+    source = contract.read_text(encoding="utf-8")
+    ast.parse(source, filename=str(contract))
+    missing = [token for token in invariants if token not in source]
+    if missing:
+        raise SystemExit(f"Required invariants missing from {name}: {missing}")
+    if "import pytest" in source or "from pytest" in source:
+        raise SystemExit(f"Test dependencies must not appear in deployable contract source: {name}")
 
 lint = shutil.which("genvm-lint") or shutil.which("genvm-lint.exe")
 if lint is None:
@@ -60,16 +78,21 @@ if lint is None:
 
 artifacts = ROOT / "artifacts"
 artifacts.mkdir(exist_ok=True)
-schema_path = artifacts / "versionwake.abi.json"
 run([sys.executable, "-m", "compileall", "-q", str(CONTRACT_DIR)])
 run([sys.executable, "-m", "pytest", "tests/direct", "-q"])
-run([lint, "check", str(CONTRACT), "--json"])
-run([lint, "schema", str(CONTRACT), "--output", str(schema_path)])
-try:
-    schema = json.loads(schema_path.read_text(encoding="utf-8"))
-except (OSError, json.JSONDecodeError) as exc:
-    raise SystemExit(f"ABI/schema output is missing or invalid JSON: {exc}") from exc
-if not isinstance(schema, dict) or not schema:
-    raise SystemExit("ABI/schema output is empty or has an unexpected shape")
+for name in CONTRACT_SOURCES:
+    contract = CONTRACT_DIR / name
+    schema_path = artifacts / f"{contract.stem}.abi.json"
+    run([lint, "check", str(contract), "--json"])
+    run([lint, "schema", str(contract), "--output", str(schema_path)])
+    try:
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"ABI/schema output for {name} is missing or invalid JSON: {exc}") from exc
+    if not isinstance(schema, dict) or not schema:
+        raise SystemExit(f"ABI/schema output for {name} is empty or has an unexpected shape")
 
-print(f"Versionwake preflight PASS: {len(required_invariants)} invariants, Direct Mode, GenVM lint, ABI/schema (GenVM artifact {PINNED_GENVM_RELEASE})")
+print(
+    "Versionwake preflight PASS: exactly two deployable sources, syntax and safety invariants, "
+    f"Direct Mode, lint and schema for both contracts (GenVM artifact {PINNED_GENVM_RELEASE})"
+)

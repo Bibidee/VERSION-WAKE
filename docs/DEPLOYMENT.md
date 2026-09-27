@@ -1,6 +1,8 @@
-# Versionwake deployment and release record
+# Versionwake + VersionGuard deployment and release record
 
-## Current deployment — v0.1.1
+## Historical / superseded deployment — Versionwake v0.1.1
+
+This is the last deployed Versionwake source before the current v0.2.0 / VersionGuard v0.1.0 source changes. It is preserved as historical evidence and is not a deployment of either current source.
 
 | Evidence | Value |
 | --- | --- |
@@ -18,7 +20,7 @@
 
 The source was not edited between its final release-gate commit/hash and deployment.
 
-## Live lifecycle evidence — v0.1.1
+## Historical live lifecycle evidence — v0.1.1
 
 Controlled fixture notice `VWK-LIVE-002` used commit-pinned [baseline](https://raw.githubusercontent.com/Bibidee/VERSION-WAKE/6c941f5e8b140acce424fc63f5f1afb26cfe694b/evidence/live/baseline.txt) (SHA-256 `5cc129eaa1c8adbebf275ea957989e5f9baed1d5edc6b2c74e5fceb6130d5524`) and [notice](https://raw.githubusercontent.com/Bibidee/VERSION-WAKE/6c941f5e8b140acce424fc63f5f1afb26cfe694b/evidence/live/notice.txt) (SHA-256 `6249db9322cef1faf3bef8426da5c55233bfc9c5dad0cf302df2e441542b4af9`). The fixture is demonstrative and not a factual claim about a real third-party SDK.
 
@@ -29,6 +31,10 @@ Controlled fixture notice `VWK-LIVE-002` used commit-pinned [baseline](https://r
 ## Historical / superseded v0.1.0 deployment
 
 The first deployment [`0xC85F766E74c77638E70859a417d01b799726Eb7E`](https://explorer-studio.genlayer.com/address/0xC85F766E74c77638E70859a417d01b799726Eb7E), deployment transaction [`0x79eec415ef9e96903b211bab2fc35d672bd2d0a4d099c22f2a87ba4c82203bf5`](https://explorer-studio.genlayer.com/tx/0x79eec415ef9e96903b211bab2fc35d672bd2d0a4d099c22f2a87ba4c82203bf5), is historical. Its review transaction [`0xe2efe0ed00090b6dfb1018a8eb10be05c0b87ef9344764a533a720992d0b6742`](https://explorer-studio.genlayer.com/tx/0xe2efe0ed00090b6dfb1018a8eb10be05c0b87ef9344764a533a720992d0b6742) finalized but GenVM failed while encoding the four-positional-field `NoticeReviewed` event (`SystemError: 2: inval`), leaving the notice pending. v0.1.1 emits only three positional fields and moves `change_kind` into the event blob; the new live review finalized successfully.
+
+## Current source deployment status
+
+Versionwake v0.2.0 and VersionGuard v0.1.0 have not yet been verified as deployed. Do not use the historical Versionwake v0.1.1 address or transaction as evidence for either current source. Deploy only to GenLayer Studionet chain ID `61999`, after the final commit passes the release gate. Deploy both exact frozen sources, verify each transaction reaches `FINALIZED` with successful GenVM execution, retrieve deployed source through the supported code retrieval API, and compare exact bytes against the frozen local files. Then run the two-contract lifecycle: register policy, submit notice, read pending state, review to confirmed, apply exact notice through VersionGuard, read both final states, and confirm replay and untrusted-proposer rejection. Simulator results are test evidence, not live-chain evidence.
 
 ## Release gate for future source changes
 
@@ -41,12 +47,14 @@ python scripts/preflight.py
 python -m pytest tests/direct -q
 genvm-lint check contracts/versionwake.py --json
 genvm-lint schema contracts/versionwake.py --output artifacts/versionwake.abi.json
+genvm-lint check contracts/version_guard.py --json
+genvm-lint schema contracts/version_guard.py --output artifacts/version_guard.abi.json
 ```
 
-All commands must exit successfully; Direct Mode tests must execute rather than skip due to missing GenLayer tooling. The deployable `contracts/` directory must contain exactly one Python source. If any check fails, do not deploy. Correct the cause, rerun the complete gate, and verify CI on that exact commit.
+All commands must exit successfully; Direct Mode tests must execute rather than skip due to missing GenLayer tooling. The deployable `contracts/` directory must contain exactly `versionwake.py` and `version_guard.py`. If any check fails, do not deploy. Correct the cause, rerun the complete gate, and verify CI on that exact commit.
 
 ## Deployment and future live-evidence checklist
 
-For each future deployment, keep the current v0.1.1 evidence intact and clearly label older addresses historical. Record each live notice ID, proposer, artifact URLs and raw-byte hashes, proposal/review transactions, consensus results, and canonical stored outcome.
+For each future deployment, keep v0.1.1 evidence intact and clearly label it historical. Record both source commits/hashes, contract addresses, deployment and transaction hashes, source-parity results, exact chain ID, policy ID/owner/trusted proposer, live notice ID and proposer, artifact URLs and raw-byte hashes, proposal/review/apply transactions, consensus results, and canonical Versionwake and VersionGuard reads. Never present simulator-only calls as live evidence.
 
 No wallet or deployment credentials belong in this repository. A finalized deployment or semantic result must never be inferred from an EVM submission receipt alone; verify the Intelligent Contract transaction's GenLayer lifecycle/finality.
