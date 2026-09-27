@@ -4,7 +4,7 @@
 
 Versionwake records a proposer-scoped, immutable notice about one named subject and pinned version. The submitter commits two HTTPS artifacts: a baseline snapshot and a candidate notice. Reviewers independently fetch each URL, reject non-success HTTP results, empty/oversized/invalid-UTF-8 content, and compare SHA-256 against the exact raw bytes. Only verified UTF-8 content is passed to semantic review.
 
-Deterministic responsibilities include input normalization and limits, DNS-style HTTPS URL admission, proposer namespacing, duplicate/capacity checks, raw-byte digest checks, schema validation, outcome derivation, access control, and persistent state updates. Web requests and model calls run only within `gl.vm.run_nondet_unsafe`; contract storage is copied into local strings before the block. No storage writes or events occur inside the nondeterministic callbacks.
+Deterministic responsibilities include input normalization and limits, DNS-style HTTPS URL admission, proposer namespacing, duplicate/capacity checks, raw-byte digest checks, schema validation, outcome derivation, access control, and persistent state updates. Web requests and model calls run only within `gl.vm.run_nondet_unsafe`; contract storage is copied into local strings before the block. No storage writes or events occur inside the nondeterministic callbacks. Review events keep the indexed positional fields bounded; the diagnostic change category is emitted as a non-indexed blob field.
 
 ## Consensus rule
 

@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from genlayer import *
 
 
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 PENDING = "pending"
 CONFIRMED = "confirmed"
 NO_MATERIAL_CHANGE = "no_material_change"
@@ -63,7 +63,7 @@ class NoticeSubmitted(gl.Event):
 
 
 class NoticeReviewed(gl.Event):
-    def __init__(self, notice_id: str, proposer: Address, outcome: str, change_kind: str, /, **blob): ...
+    def __init__(self, notice_id: str, proposer: Address, outcome: str, /, **blob): ...
 
 
 class NoticeCancelled(gl.Event):
@@ -382,7 +382,12 @@ class Versionwake(gl.Contract):
         notice.confidence = u256(result["confidence"])
         notice.rationale = result["rationale"]
         notice.reviewed_at = u256(int(datetime.now(timezone.utc).timestamp()))
-        NoticeReviewed(str(notice.notice_id), notice.proposer, outcome, result["change_kind"]).emit()
+        NoticeReviewed(
+            str(notice.notice_id),
+            notice.proposer,
+            outcome,
+            change_kind=result["change_kind"],
+        ).emit()
 
     @gl.public.write
     def cancel_notice(self, notice_id: str) -> None:

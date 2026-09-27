@@ -140,7 +140,7 @@ def test_get_info_reports_version_and_protocol_bounds(direct_vm, direct_deploy, 
     contract = deploy(direct_vm, direct_deploy, direct_alice)
     info = contract.get_info()
     assert info["name"] == "Versionwake"
-    assert info["version"] == "0.1.0"
+    assert info["version"] == "0.1.1"
     assert info["max_notices"] == 512
     assert info["max_artifact_bytes"] == 16000
     assert info["minimum_confidence"] == 75
