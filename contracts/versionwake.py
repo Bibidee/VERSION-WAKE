@@ -138,7 +138,7 @@ def valid_https_domain_url(value: str, label: str) -> str:
 
 
 def valid_model_result(value) -> bool:
-    if not isinstance(value, dict) or len(value) != 5:
+    if not isinstance(value, dict) or len(value) != 4:
         return False
     target_match = value.get("target_match")
     change_kind = value.get("change_kind")
