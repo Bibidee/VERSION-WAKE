@@ -13,6 +13,14 @@ NOTICE = b"Widget API v1 submit(record) is deprecated and will be removed after 
 SUBJECT = "example/widget-api"
 VERSION = "1.0"
 SUMMARY = "The publisher notice deprecates submit(record) for Widget API v1."
+LIVE_BASELINE = (
+    b"Controlled Versionwake lifecycle fixture VWK-LIVE-001. "
+    b"Example Widget SDK version 1.0 supports the GET /v1/status endpoint."
+)
+LIVE_NOTICE = (
+    b"Controlled Versionwake lifecycle fixture VWK-LIVE-001. "
+    b"Example Widget SDK version 1.0 deprecates GET /v1/status and schedules its removal for 2025-01-01."
+)
 
 
 def digest(raw):
@@ -49,6 +57,29 @@ def install_review_mocks(direct_vm, result=None, baseline=BASELINE, notice=NOTIC
             "rationale": "The notice names the pinned API version and explicitly says the method is deprecated.",
         }
     direct_vm.mock_llm(r"Return a JSON object with exactly these keys", json.dumps(result))
+
+
+def submit_live_boundary_fixture(contract):
+    contract.submit_notice(
+        "live-boundary",
+        "example/widget-sdk",
+        "1.0",
+        BASELINE_URL,
+        digest(LIVE_BASELINE),
+        NOTICE_URL,
+        digest(LIVE_NOTICE),
+        "The pinned fixture says the endpoint is deprecated and scheduled for removal.",
+    )
+
+
+def compare_validator_result(direct_vm, direct_deploy, direct_alice, leader, validator):
+    contract = deploy(direct_vm, direct_deploy, direct_alice)
+    submit(contract)
+    install_review_mocks(direct_vm, result=leader)
+    contract.review_notice("notice-1", direct_alice)
+    direct_vm.clear_mocks()
+    install_review_mocks(direct_vm, result=validator)
+    return contract, direct_vm.run_validator()
 
 
 def test_valid_proposal_is_namespaced_and_readable(direct_vm, direct_deploy, direct_alice, direct_bob):
@@ -140,10 +171,11 @@ def test_get_info_reports_version_and_protocol_bounds(direct_vm, direct_deploy, 
     contract = deploy(direct_vm, direct_deploy, direct_alice)
     info = contract.get_info()
     assert info["name"] == "Versionwake"
-    assert info["version"] == "0.2.0"
+    assert info["version"] == "0.2.1"
     assert info["max_notices_per_proposer_lifetime"] == 64
     assert info["max_artifact_bytes"] == 16000
     assert info["minimum_confidence"] == 75
+    assert info["consensus_classes"] == ["none", "non_breaking", "breaking", "lifecycle_material", "unclear"]
 
 
 def test_lifetime_capacity_is_isolated_by_proposer_and_keeps_terminal_history(direct_vm, direct_deploy, direct_alice, direct_bob):
@@ -192,6 +224,7 @@ def test_review_hash_verifies_both_documents_and_confirms_deprecation(direct_vm,
     assert row["outcome"] == "confirmed"
     assert row["target_match"] == "yes"
     assert row["change_kind"] == "deprecation"
+    assert row["consensus_class"] == "lifecycle_material"
     assert row["confidence"] == 91
     assert contract.is_confirmed_for("notice-1", direct_alice, SUBJECT, VERSION) is True
     assert contract.is_confirmed_for("notice-1", direct_alice, SUBJECT, "2.0") is False
@@ -332,3 +365,118 @@ def test_validator_confidence_crossing_threshold_disagrees(direct_vm, direct_dep
     direct_vm.mock_web(r"notices\.example\.net/releases/v1\.txt", {"status": 200, "body": NOTICE})
     direct_vm.mock_llm(r"Return a JSON object with exactly these keys", json.dumps({"target_match": "yes", "change_kind": "sunset", "confidence": 70, "rationale": "The signal is too uncertain."}))
     assert direct_vm.run_validator() is False
+
+
+@pytest.mark.parametrize("leader_kind,leader_confidence,validator_kind,validator_confidence", [
+    ("deprecation", 91, "sunset", 82),
+    ("sunset", 82, "deprecation", 96),
+    ("deprecation", 81, "sunset", 99),
+    ("sunset", 70, "deprecation", 74),
+])
+def test_lifecycle_subtypes_agree_when_target_and_threshold_outcome_match(
+    direct_vm, direct_deploy, direct_alice, leader_kind, leader_confidence, validator_kind, validator_confidence
+):
+    leader = {
+        "target_match": "yes",
+        "change_kind": leader_kind,
+        "confidence": leader_confidence,
+        "rationale": "The notice calls the endpoint deprecated and gives a scheduled removal date.",
+    }
+    validator = {
+        "target_match": "yes",
+        "change_kind": validator_kind,
+        "confidence": validator_confidence,
+        "rationale": "The same wording can be read as a sunset of the pinned endpoint.",
+    }
+    contract, agreed = compare_validator_result(direct_vm, direct_deploy, direct_alice, leader, validator)
+    assert agreed is True
+    row = contract.get_notice("notice-1", direct_alice)
+    assert row["consensus_class"] == "lifecycle_material"
+    assert row["change_kind"] == leader_kind  # preserve the leader subtype for diagnostics
+    assert row["status"] == ("confirmed" if leader_confidence >= 75 else "inconclusive")
+
+
+@pytest.mark.parametrize("leader_kind,validator_kind", [
+    ("breaking", "deprecation"),
+    ("breaking", "sunset"),
+    ("non_breaking", "deprecation"),
+    ("none", "sunset"),
+    ("deprecation", "unclear"),
+])
+def test_different_change_classes_still_disagree(direct_vm, direct_deploy, direct_alice, leader_kind, validator_kind):
+    leader = {"target_match": "yes", "change_kind": leader_kind, "confidence": 91, "rationale": "Leader classification."}
+    validator = {"target_match": "yes", "change_kind": validator_kind, "confidence": 91, "rationale": "Validator classification."}
+    _, agreed = compare_validator_result(direct_vm, direct_deploy, direct_alice, leader, validator)
+    assert agreed is False
+
+
+@pytest.mark.parametrize("leader_target,validator_target", [
+    ("yes", "no"),
+    ("yes", "unclear"),
+])
+def test_lifecycle_equivalence_requires_identical_target_applicability(
+    direct_vm, direct_deploy, direct_alice, leader_target, validator_target
+):
+    leader = {"target_match": leader_target, "change_kind": "deprecation", "confidence": 91, "rationale": "Leader."}
+    validator = {"target_match": validator_target, "change_kind": "sunset", "confidence": 91, "rationale": "Validator."}
+    _, agreed = compare_validator_result(direct_vm, direct_deploy, direct_alice, leader, validator)
+    assert agreed is False
+
+
+def test_lifecycle_equivalence_does_not_hide_threshold_crossing(direct_vm, direct_deploy, direct_alice):
+    leader = {"target_match": "yes", "change_kind": "sunset", "confidence": 82, "rationale": "Above threshold."}
+    validator = {"target_match": "yes", "change_kind": "deprecation", "confidence": 74, "rationale": "Below threshold."}
+    _, agreed = compare_validator_result(direct_vm, direct_deploy, direct_alice, leader, validator)
+    assert agreed is False
+
+
+def test_exact_live_deprecation_sunset_fixture_reaches_canonical_equivalence(direct_vm, direct_deploy, direct_alice):
+    contract = deploy(direct_vm, direct_deploy, direct_alice)
+    submit_live_boundary_fixture(contract)
+    leader = {"target_match": "yes", "change_kind": "sunset", "confidence": 82, "rationale": "It schedules endpoint removal."}
+    install_review_mocks(direct_vm, result=leader, baseline=LIVE_BASELINE, notice=LIVE_NOTICE)
+    contract.review_notice("live-boundary", direct_alice)
+    direct_vm.clear_mocks()
+    validator = {"target_match": "yes", "change_kind": "deprecation", "confidence": 91, "rationale": "It declares the endpoint deprecated."}
+    install_review_mocks(direct_vm, result=validator, baseline=LIVE_BASELINE, notice=LIVE_NOTICE)
+    assert direct_vm.run_validator() is True
+    row = contract.get_notice("live-boundary", direct_alice)
+    assert row["status"] == "confirmed"
+    assert row["consensus_class"] == "lifecycle_material"
+    assert row["change_kind"] == "sunset"
+
+
+def test_malformed_leader_result_cannot_agree_with_valid_lifecycle_analysis(direct_vm, direct_deploy, direct_alice):
+    contract = deploy(direct_vm, direct_deploy, direct_alice)
+    submit(contract)
+    install_review_mocks(direct_vm, result={"target_match": "yes"})
+    with direct_vm.expect_revert():
+        contract.review_notice("notice-1", direct_alice)
+    direct_vm.clear_mocks()
+    install_review_mocks(direct_vm, result={"target_match": "yes", "change_kind": "sunset", "confidence": 91, "rationale": "Valid."})
+    assert direct_vm.run_validator() is False
+    assert contract.get_notice("notice-1", direct_alice)["status"] == "pending"
+
+
+def test_retryable_leader_observation_cannot_agree_with_valid_analysis(direct_vm, direct_deploy, direct_alice):
+    contract = deploy(direct_vm, direct_deploy, direct_alice)
+    submit(contract)
+    install_review_mocks(direct_vm, baseline_status=503)
+    with direct_vm.expect_revert("External review unavailable"):
+        contract.review_notice("notice-1", direct_alice)
+    direct_vm.clear_mocks()
+    install_review_mocks(direct_vm, result={"target_match": "yes", "change_kind": "sunset", "confidence": 91, "rationale": "Valid."})
+    assert direct_vm.run_validator() is False
+    assert contract.get_notice("notice-1", direct_alice)["status"] == "pending"
+
+
+def test_invalid_artifact_leader_observation_cannot_agree_with_valid_analysis(direct_vm, direct_deploy, direct_alice):
+    contract = deploy(direct_vm, direct_deploy, direct_alice)
+    submit(contract)
+    install_review_mocks(direct_vm, baseline=b"different bytes fail the committed digest")
+    with direct_vm.expect_revert("Committed source could not be verified"):
+        contract.review_notice("notice-1", direct_alice)
+    direct_vm.clear_mocks()
+    install_review_mocks(direct_vm, result={"target_match": "yes", "change_kind": "sunset", "confidence": 91, "rationale": "Valid."})
+    assert direct_vm.run_validator() is False
+    assert contract.get_notice("notice-1", direct_alice)["status"] == "pending"

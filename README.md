@@ -8,7 +8,7 @@ It is contract-only: there is no frontend, token, escrow, trusted decision servi
 
 A deterministic contract can verify that downloaded bytes match a SHA-256 commitment, but cannot determine whether prose in a new notice actually applies to a named version or describes a deprecation rather than a compatible change. Versionwake uses ordinary deterministic code for IDs, bounds, hashes, state transitions, and output validation. Within `run_nondet_unsafe`, the leader and validators independently fetch the exact committed baseline and notice and make the bounded semantic classification. Only after consensus does deterministic execution store the result.
 
-The reviewers compare `target_match`, `change_kind`, and the derived outcome. Rationale and exact confidence values are diagnostic rather than consensus-critical; crossing the fixed confidence threshold changes the derived outcome and therefore fails equivalence. Different categories or outcomes disagree. A malformed model response is never accepted as an analysis: its validator returns disagreement so GenLayer can rotate execution rather than committing an invented verdict. Source unavailability is retryable; integrity failures never authorize a change.
+The reviewers compare exact `target_match`, a bounded canonical consensus class, and the deterministic outcome. `change_kind` remains the leader's exact diagnostic subtype. For an exact target match, `deprecation` and `sunset` map to `lifecycle_material`; they may agree only when both observations derive the same outcome. `breaking`, `non_breaking`, `none`, and `unclear` remain distinct classes. A confidence-threshold crossing, target mismatch, different outcome, or different class still causes disagreement. `get_notice()` exposes both `change_kind` and `consensus_class`, so consumers can distinguish diagnostic subtype from the consensus-backed class. Rationale and exact confidence values themselves are diagnostic, but confidence's threshold consequence remains consensus-critical. Malformed model output is never accepted as analysis; source unavailability is retryable, and integrity failures never authorize a change.
 
 Without GenLayer, an application could still fetch and hash the documents, but would normally rely on one server or one model call to decide applicability and impact. That service could selectively classify notices. Versionwake places the semantic judgment and its explicit equivalence rule in the consensus execution path. This reduces single-operator dependence; it does not prove that an artifact publisher is authentic or that every validator is infallible.
 
@@ -64,7 +64,7 @@ Each record is immutable except for its one review outcome (or pending cancellat
 - `submit_notice(notice_id, subject, version_ref, baseline_url, baseline_hash, notice_url, notice_hash, summary)` — permissionless immutable submission. IDs are namespaced by the submitting address.
 - `review_notice(notice_id, proposer)` — permissionless semantic review with independent validator observations.
 - `cancel_notice(notice_id)` — submitting address may cancel its own pending record only.
-- `get_notice(notice_id, proposer)` — read the complete evidence commitment and review record.
+- `get_notice(notice_id, proposer)` — read the complete evidence commitment and review record, including diagnostic `change_kind` and canonical `consensus_class`.
 - `is_confirmed_for(notice_id, proposer, subject, version_ref)` — exact-scope boolean gate for downstream callers.
 - `get_info()` — version and protocol bounds.
 
@@ -128,13 +128,17 @@ This controlled fixture demonstrates the full submitted-notice review path. It i
 - Canonical reviewed state: `confirmed`, `target_match=yes`, `change_kind=sunset`, confidence `95`; rationale: “The notice explicitly names Example Widget SDK version 1.0, matching the subject and pinned version, and states that GET /v1/status is deprecated with a scheduled removal date of 2025-01-01, which is a scheduled removal (sunset) relative to the baseline where the endpoint was supported.”
 - The exact-scope `is_confirmed_for` gate returned `true` when queried with typed GenLayerJS arguments.
 
+### Historical semantic disagreement — v0.2.0 (superseded)
+
+The v0.2.0 review [`0x6e51b265c2bbe2ff6d9d118268405380d84bac34a1a7da9a01f8eae92d461fcd`](https://explorer-studio.genlayer.com/tx/0x6e51b265c2bbe2ff6d9d118268405380d84bac34a1a7da9a01f8eae92d461fcd) on [`0x1Bd5cA5da9a6142adAFFAA937f93639cbdF637a9`](https://explorer-studio.genlayer.com/address/0x1Bd5cA5da9a6142adAFFAA937f93639cbdF637a9) finalized `MAJORITY_DISAGREE` after six rounds. Available consensus history shows outputs alternating between `deprecation` and `sunset` for the same hash-pinned notice: validators agreed on target applicability and a material lifecycle consequence, but exact subtype comparison prevented equivalence. The notice remained `pending`; no material result was authorized. The v0.2.1 candidate adds an explicit `lifecycle_material` consensus class only for exact-target deprecation/sunset results, while retaining the leader's subtype for diagnostics and keeping breaking/non-material/unclear classes distinct. The corrected source is not current deployment evidence until separately finalized and source-parity checked.
+
 ### Historical / superseded v0.1.0 deployment
 
 The earlier v0.1.0 deployment [`0xC85F766E74c77638E70859a417d01b799726Eb7E`](https://explorer-studio.genlayer.com/address/0xC85F766E74c77638E70859a417d01b799726Eb7E), transaction [`0x79eec415ef9e96903b211bab2fc35d672bd2d0a4d099c22f2a87ba4c82203bf5`](https://explorer-studio.genlayer.com/tx/0x79eec415ef9e96903b211bab2fc35d672bd2d0a4d099c22f2a87ba4c82203bf5), is historical and superseded. Its live review [`0xe2efe0ed00090b6dfb1018a8eb10be05c0b87ef9344764a533a720992d0b6742`](https://explorer-studio.genlayer.com/tx/0xe2efe0ed00090b6dfb1018a8eb10be05c0b87ef9344764a533a720992d0b6742) finalized with a GenVM event-encoding error at `NoticeReviewed.emit()` (`SystemError: 2: inval`); its notice remained pending. v0.1.1 bounds the event's positional fields and keeps the diagnostic category in the event blob.
 
 ## Current source release status
 
-Versionwake v0.2.0 and VersionGuard v0.1.0 are source changes relative to the historical deployment above. They are not represented as deployed until their exact source commits are deployed on Studionet chain 61999, finalized, and their deployed source is checked for byte-for-byte parity. The release process must separately record each deployment and a real two-contract lifecycle; simulator evidence is not live-chain evidence.
+Versionwake v0.2.1 is the corrected source candidate. Its deployment and live lifecycle are not claimed until the final release gate, deployment finality, deployed-source parity, and a fresh semantic review are verified. VersionGuard v0.1.0 remains a separate optional consumer; any new live integration must register a new policy pinned to the corrected Versionwake address. Simulator results are not live-chain evidence.
 
 ## References
 

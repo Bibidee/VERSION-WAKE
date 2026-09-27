@@ -251,3 +251,52 @@ def test_pending_or_cancelled_notice_cannot_transition_policy(sim_world, mode):
     with pytest.raises(Exception):
         apply(world)
     assert policy(world)["state"] == "active"
+
+
+@pytest.mark.parametrize("diagnostic_subtype", ["deprecation", "sunset"])
+def test_lifecycle_subtypes_have_the_same_downstream_policy_consequence(sim_world, diagnostic_subtype):
+    world = sim_world
+    engine = world["engine"]
+    live_baseline_url = "https://baseline.example.org/release/live.txt"
+    live_notice_url = "https://notices.example.net/release/live.txt"
+    live_baseline = (
+        b"Controlled Versionwake lifecycle fixture VWK-LIVE-001. "
+        b"Example Widget SDK version 1.0 supports the GET /v1/status endpoint."
+    )
+    live_notice = (
+        b"Controlled Versionwake lifecycle fixture VWK-LIVE-001. "
+        b"Example Widget SDK version 1.0 deprecates GET /v1/status and schedules its removal for 2025-01-01."
+    )
+    notice_id = "live-lifecycle-" + diagnostic_subtype
+    engine.call_method(
+        world["versionwake"],
+        "submit_notice",
+        [notice_id, SUBJECT, VERSION, live_baseline_url, digest(live_baseline), live_notice_url, digest(live_notice), "Pinned notice says deprecation with a scheduled removal date."],
+        sender=world["proposer"],
+    )
+    engine.vm.mock_web(r"baseline\.example\.org/release/live\.txt", {"status": 200, "body": live_baseline})
+    engine.vm.mock_web(r"notices\.example\.net/release/live\.txt", {"status": 200, "body": live_notice})
+    engine.vm.mock_llm(
+        r"Return a JSON object with exactly these keys",
+        json.dumps({
+            "target_match": "yes",
+            "change_kind": diagnostic_subtype,
+            "confidence": 91,
+            "rationale": "The pinned endpoint is described as deprecated and scheduled for removal.",
+        }),
+    )
+    engine.call_method(
+        world["versionwake"], "review_notice", [notice_id, world["addresses"]["proposer"]], sender=world["proposer"]
+    )
+    row = engine.call_method(
+        world["versionwake"], "get_notice", [notice_id, world["addresses"]["proposer"]], sender=world["proposer"]
+    )
+    assert row["status"] == "confirmed"
+    assert row["change_kind"] == diagnostic_subtype
+    assert row["consensus_class"] == "lifecycle_material"
+
+    register_policy(world, policy_id="lifecycle-" + diagnostic_subtype)
+    apply(world, policy_id="lifecycle-" + diagnostic_subtype, notice_id=notice_id)
+    result = policy(world, policy_id="lifecycle-" + diagnostic_subtype)
+    assert result["state"] == "review_required"
+    assert result["last_change_kind"] == diagnostic_subtype

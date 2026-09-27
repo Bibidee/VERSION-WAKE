@@ -27,6 +27,10 @@ CONTRACT_SOURCES = {
         "MAX_NOTICES_PER_PROPOSER = 64",
         "proposer_notice_counts: TreeMap[str, u256]",
         "def get_proposer_notice_count(",
+        'VERSION = "0.2.1"',
+        "def consensus_class_for(value:",
+        '"lifecycle_material"',
+        '"consensus_class": str(notice.consensus_class)',
     },
     "version_guard.py": {
         '"Depends": "py-genlayer:',

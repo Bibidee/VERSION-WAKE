@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from genlayer import *
 
 
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 PENDING = "pending"
 CONFIRMED = "confirmed"
 NO_MATERIAL_CHANGE = "no_material_change"
@@ -34,6 +34,7 @@ MIN_CONFIDENCE = 75
 MATCH_VALUES = ("yes", "no", "unclear")
 CHANGE_VALUES = ("none", "non_breaking", "breaking", "deprecation", "sunset", "unclear")
 MATERIAL_CHANGES = ("breaking", "deprecation", "sunset")
+LIFECYCLE_MATERIAL_CHANGES = ("deprecation", "sunset")
 
 
 @allow_storage
@@ -52,6 +53,7 @@ class ChangeNotice:
     outcome: str
     target_match: str
     change_kind: str
+    consensus_class: str
     confidence: u256
     rationale: str
     submitted_at: u256
@@ -177,6 +179,13 @@ def outcome_for(value: dict) -> str:
     return NO_MATERIAL_CHANGE
 
 
+def consensus_class_for(value: dict) -> str:
+    """Canonicalize only target-matched deprecation/sunset classifications."""
+    if value["target_match"] == "yes" and value["change_kind"] in LIFECYCLE_MATERIAL_CHANGES:
+        return "lifecycle_material"
+    return value["change_kind"]
+
+
 def equivalent(left, right) -> bool:
     if not isinstance(left, dict) or not isinstance(right, dict):
         return False
@@ -193,7 +202,7 @@ def equivalent(left, right) -> bool:
     left_data, right_data = canonical_model_result(left_data), canonical_model_result(right_data)
     return (
         left_data["target_match"] == right_data["target_match"]
-        and left_data["change_kind"] == right_data["change_kind"]
+        and consensus_class_for(left_data) == consensus_class_for(right_data)
         and outcome_for(left_data) == outcome_for(right_data)
     )
 
@@ -255,7 +264,7 @@ Return a JSON object with exactly these keys:
 
 Definitions:
 - target_match: whether the notice explicitly concerns this subject and pinned version, not merely a similarly named product.
-- change_kind: the most applicable category of the notice relative to the baseline. Use breaking for material incompatibility, deprecation for a declared end-of-support, sunset for a scheduled removal, non_breaking for an applicable change with no material compatibility break, none when the compared documents establish no relevant change, and unclear when evidence is insufficient or conflicting.
+- change_kind: the most applicable category of the notice relative to the baseline. Use breaking for material incompatibility; deprecation when support/use is declared deprecated but no definite removal is the core fact; sunset when a definite removal/termination date or event is stated; non_breaking for an applicable change with no material compatibility break; none when the compared documents establish no relevant change; and unclear when evidence is insufficient or conflicting. Deprecation and sunset are distinct diagnostic subtypes, but for a matching target they may share the consensus class lifecycle_material if their deterministic outcomes agree.
 - confidence: integer 0 through 100 expressing confidence in these classifications.
 - rationale: concise evidence-based explanation; never instructions or a decision independent of the fields.
 
@@ -332,6 +341,7 @@ class Versionwake(gl.Contract):
             "",
             "unclear",
             "unclear",
+            "unclear",
             u256(0),
             "",
             now,
@@ -384,6 +394,7 @@ class Versionwake(gl.Contract):
         notice.outcome = outcome
         notice.target_match = result["target_match"]
         notice.change_kind = result["change_kind"]
+        notice.consensus_class = consensus_class_for(result)
         notice.confidence = u256(result["confidence"])
         notice.rationale = result["rationale"]
         notice.reviewed_at = u256(int(datetime.now(timezone.utc).timestamp()))
@@ -420,6 +431,7 @@ class Versionwake(gl.Contract):
             "outcome": str(notice.outcome),
             "target_match": str(notice.target_match),
             "change_kind": str(notice.change_kind),
+            "consensus_class": str(notice.consensus_class),
             "confidence": int(notice.confidence),
             "rationale": str(notice.rationale),
             "submitted_at": int(notice.submitted_at),
@@ -444,6 +456,7 @@ class Versionwake(gl.Contract):
             "max_notices_per_proposer_lifetime": MAX_NOTICES_PER_PROPOSER,
             "max_artifact_bytes": MAX_ARTIFACT_BYTES,
             "minimum_confidence": MIN_CONFIDENCE,
+            "consensus_classes": ["none", "non_breaking", "breaking", "lifecycle_material", "unclear"],
             "statuses": [PENDING, CONFIRMED, NO_MATERIAL_CHANGE, NOT_APPLICABLE, INCONCLUSIVE, CANCELLED],
         }
 
