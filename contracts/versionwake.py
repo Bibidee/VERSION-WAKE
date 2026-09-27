@@ -201,7 +201,10 @@ def equivalent(left, right) -> bool:
 def fetch_verified(source_url: str, expected_hash: str) -> dict:
     try:
         response = gl.nondet.web.get(source_url)
-        status_code = int(response.status_code)
+        status_value = getattr(response, "status_code", None)
+        if status_value is None:
+            status_value = getattr(response, "status", None)
+        status_code = int(status_value)
         raw = response.body
     except Exception:
         return {"kind": RETRYABLE, "code": "fetch_unavailable"}
