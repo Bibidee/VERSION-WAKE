@@ -1,0 +1,1 @@
+Example Widget SDK 2.0.0 migration notice: GET /v1/status has been removed. Call GET /v2/health instead. This change is not backward compatible. Released 2026-09-20.
