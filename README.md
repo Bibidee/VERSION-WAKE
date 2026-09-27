@@ -71,16 +71,31 @@ The preflight fails if a required tool, test, linter, or schema step is missing 
 
 ## Studionet deployment
 
-The frozen source at commit `d91ceba7f56c52722fa2769291700b3a5e444b12` was deployed to GenLayer Studionet. The deployment transaction finalized with `MAJORITY_AGREE` and the leader GenVM execution reported `SUCCESS`.
+The current deployment is Versionwake v0.1.1 at frozen source commit `e3d756184e18e75b4f984cc0af3202e5d5c3c827`. Its deployment transaction finalized with `MAJORITY_AGREE` and leader GenVM `SUCCESS`.
 
-- Contract: [`0xC85F766E74c77638E70859a417d01b799726Eb7E`](https://explorer-studio.genlayer.com/address/0xC85F766E74c77638E70859a417d01b799726Eb7E)
-- Deployment transaction: [`0x79eec415ef9e96903b211bab2fc35d672bd2d0a4d099c22f2a87ba4c82203bf5`](https://explorer-studio.genlayer.com/tx/0x79eec415ef9e96903b211bab2fc35d672bd2d0a4d099c22f2a87ba4c82203bf5)
-- Contract source SHA-256: `814ad05373d84d0d25575471ad063b441d1fdc09007509c1623c6c12361179ed`
-- Source parity: **verified byte-for-byte** using GenLayerJS `getContractCode()` (`gen_getContractCode`); local and retrieved source were both 17,399 bytes and had the same SHA-256.
-- `get_info()` returned name `Versionwake`, version `0.1.0`, maximum 512 notices, maximum artifact size 16,000 bytes, and minimum confidence 75.
-- Release gate: GitHub Actions run [36320944416](https://github.com/Bibidee/VERSION-WAKE/actions/runs/36320944416) passed; all 61 Direct Mode tests passed, followed by GenVM lint and schema generation.
+- Contract: [`0xfaC85C5728F57b53B2973add5A14C24F7A45268d`](https://explorer-studio.genlayer.com/address/0xfaC85C5728F57b53B2973add5A14C24F7A45268d)
+- Deployment transaction: [`0x0c9f55e00dc657da265f636d97ac77eb81dc520f686cb645fc583e4942698c99`](https://explorer-studio.genlayer.com/tx/0x0c9f55e00dc657da265f636d97ac77eb81dc520f686cb645fc583e4942698c99)
+- Contract source SHA-256: `8c8b7ed5f03db17b83941133e885f95e458e2a29174bbf919e78b5a51d381392`
+- Source parity: **verified byte-for-byte** using GenLayerJS `getContractCode()` (`gen_getContractCode`); local and retrieved source were both 17,452 bytes and had the same SHA-256.
+- `get_info()` returned name `Versionwake`, version `0.1.1`, maximum 512 notices, maximum artifact size 16,000 bytes, and minimum confidence 75.
+- Release gate: GitHub Actions run [36322467965](https://github.com/Bibidee/VERSION-WAKE/actions/runs/36322467965) passed; all 61 Direct Mode tests passed, followed by GenVM lint and schema generation.
 
-Deployment proves source availability and contract initialization only. No live notice submission, semantic review, or confirmed notice lifecycle is claimed yet.
+### Live lifecycle evidence
+
+This controlled fixture demonstrates the full submitted-notice review path. It is intentionally a contract fixture, not a claim about a real third-party SDK.
+
+- Notice ID: `VWK-LIVE-002`; proposer: `0x2cd419603eBa593074653930Ddc4073d4FD8fc60`.
+- Subject/version: `example/widget-sdk` / `1.0`.
+- Baseline: [commit-pinned raw fixture](https://raw.githubusercontent.com/Bibidee/VERSION-WAKE/6c941f5e8b140acce424fc63f5f1afb26cfe694b/evidence/live/baseline.txt), SHA-256 `5cc129eaa1c8adbebf275ea957989e5f9baed1d5edc6b2c74e5fceb6130d5524`.
+- Notice: [commit-pinned raw fixture](https://raw.githubusercontent.com/Bibidee/VERSION-WAKE/6c941f5e8b140acce424fc63f5f1afb26cfe694b/evidence/live/notice.txt), SHA-256 `6249db9322cef1faf3bef8426da5c55233bfc9c5dad0cf302df2e441542b4af9`.
+- Proposal: [`0x6dffbb044b25ddbc71de02c8665fa916997486a1db20801a0c6917f1ad637cdf`](https://explorer-studio.genlayer.com/tx/0x6dffbb044b25ddbc71de02c8665fa916997486a1db20801a0c6917f1ad637cdf) — `FINALIZED`, `MAJORITY_AGREE`, GenVM `SUCCESS`; canonical read confirmed `pending` and matching committed fields.
+- Review: [`0xf87adedd37e1ab7ac84a32e31aad76555c3d80bf595140c38662d859c5955a1e`](https://explorer-studio.genlayer.com/tx/0xf87adedd37e1ab7ac84a32e31aad76555c3d80bf595140c38662d859c5955a1e) — `FINALIZED`, `MAJORITY_AGREE`, GenVM `SUCCESS`.
+- Canonical reviewed state: `confirmed`, `target_match=yes`, `change_kind=sunset`, confidence `95`; rationale: “The notice explicitly names Example Widget SDK version 1.0, matching the subject and pinned version, and states that GET /v1/status is deprecated with a scheduled removal date of 2025-01-01, which is a scheduled removal (sunset) relative to the baseline where the endpoint was supported.”
+- The exact-scope `is_confirmed_for` gate returned `true` when queried with typed GenLayerJS arguments.
+
+### Superseded v0.1.0 deployment
+
+The earlier v0.1.0 deployment [`0xC85F766E74c77638E70859a417d01b799726Eb7E`](https://explorer-studio.genlayer.com/address/0xC85F766E74c77638E70859a417d01b799726Eb7E), transaction [`0x79eec415ef9e96903b211bab2fc35d672bd2d0a4d099c22f2a87ba4c82203bf5`](https://explorer-studio.genlayer.com/tx/0x79eec415ef9e96903b211bab2fc35d672bd2d0a4d099c22f2a87ba4c82203bf5), is historical and superseded. Its live review [`0xe2efe0ed00090b6dfb1018a8eb10be05c0b87ef9344764a533a720992d0b6742`](https://explorer-studio.genlayer.com/tx/0xe2efe0ed00090b6dfb1018a8eb10be05c0b87ef9344764a533a720992d0b6742) finalized with a GenVM event-encoding error at `NoticeReviewed.emit()` (`SystemError: 2: inval`); its notice remained pending. v0.1.1 bounds the event's positional fields and keeps the diagnostic category in the event blob.
 
 ## References
 

@@ -1,26 +1,36 @@
 # Versionwake deployment and release record
 
-## Current deployment
-
-Versionwake v0.1.0 is deployed on GenLayer Studionet.
+## Current deployment — v0.1.1
 
 | Evidence | Value |
 | --- | --- |
-| Frozen source commit | `d91ceba7f56c52722fa2769291700b3a5e444b12` |
-| Contract source SHA-256 | `814ad05373d84d0d25575471ad063b441d1fdc09007509c1623c6c12361179ed` |
+| Frozen source commit | `e3d756184e18e75b4f984cc0af3202e5d5c3c827` |
+| Contract source SHA-256 | `8c8b7ed5f03db17b83941133e885f95e458e2a29174bbf919e78b5a51d381392` |
 | Network | GenLayer Studionet (chain ID `61999`) |
-| Contract address | [`0xC85F766E74c77638E70859a417d01b799726Eb7E`](https://explorer-studio.genlayer.com/address/0xC85F766E74c77638E70859a417d01b799726Eb7E) |
-| Deployment transaction | [`0x79eec415ef9e96903b211bab2fc35d672bd2d0a4d099c22f2a87ba4c82203bf5`](https://explorer-studio.genlayer.com/tx/0x79eec415ef9e96903b211bab2fc35d672bd2d0a4d099c22f2a87ba4c82203bf5) |
+| Contract address | [`0xfaC85C5728F57b53B2973add5A14C24F7A45268d`](https://explorer-studio.genlayer.com/address/0xfaC85C5728F57b53B2973add5A14C24F7A45268d) |
+| Deployment transaction | [`0x0c9f55e00dc657da265f636d97ac77eb81dc520f686cb645fc583e4942698c99`](https://explorer-studio.genlayer.com/tx/0x0c9f55e00dc657da265f636d97ac77eb81dc520f686cb645fc583e4942698c99) |
 | Finality / consensus | `FINALIZED` / `MAJORITY_AGREE` |
 | GenVM execution | `SUCCESS` |
 | Deployed-source parity | Verified byte-for-byte through GenLayerJS `getContractCode()` / `gen_getContractCode` |
-| Source bytes | 17,399 local; 17,399 retrieved |
-| `get_info()` | `Versionwake`, `0.1.0`, max notices `512`, max artifact bytes `16000`, minimum confidence `75` |
-| GitHub release gate | [Run 36320944416 — PASS](https://github.com/Bibidee/VERSION-WAKE/actions/runs/36320944416) |
+| Source bytes | 17,452 local; 17,452 retrieved |
+| `get_info()` | `Versionwake`, `0.1.1`, max notices `512`, max artifact bytes `16000`, minimum confidence `75` |
+| GitHub release gate | [Run 36322467965 — PASS](https://github.com/Bibidee/VERSION-WAKE/actions/runs/36322467965) |
 
-The source was not edited between its final release-gate commit/hash and deployment. Deployment evidence does **not** claim a live notice proposal or semantic-review lifecycle; those transactions have not been run.
+The source was not edited between its final release-gate commit/hash and deployment.
 
-## Required pre-deployment gate
+## Live lifecycle evidence — v0.1.1
+
+Controlled fixture notice `VWK-LIVE-002` used commit-pinned [baseline](https://raw.githubusercontent.com/Bibidee/VERSION-WAKE/6c941f5e8b140acce424fc63f5f1afb26cfe694b/evidence/live/baseline.txt) (SHA-256 `5cc129eaa1c8adbebf275ea957989e5f9baed1d5edc6b2c74e5fceb6130d5524`) and [notice](https://raw.githubusercontent.com/Bibidee/VERSION-WAKE/6c941f5e8b140acce424fc63f5f1afb26cfe694b/evidence/live/notice.txt) (SHA-256 `6249db9322cef1faf3bef8426da5c55233bfc9c5dad0cf302df2e441542b4af9`). The fixture is demonstrative and not a factual claim about a real third-party SDK.
+
+- Proposal [`0x6dffbb044b25ddbc71de02c8665fa916997486a1db20801a0c6917f1ad637cdf`](https://explorer-studio.genlayer.com/tx/0x6dffbb044b25ddbc71de02c8665fa916997486a1db20801a0c6917f1ad637cdf): `FINALIZED`, `MAJORITY_AGREE`, GenVM `SUCCESS`; canonical read returned `pending` with matching proposer, subject/version, URLs, hashes, and summary.
+- Review [`0xf87adedd37e1ab7ac84a32e31aad76555c3d80bf595140c38662d859c5955a1e`](https://explorer-studio.genlayer.com/tx/0xf87adedd37e1ab7ac84a32e31aad76555c3d80bf595140c38662d859c5955a1e): `FINALIZED`, `MAJORITY_AGREE`, GenVM `SUCCESS`.
+- Final canonical state: `confirmed`; `target_match=yes`; `change_kind=sunset`; confidence `95`. The exact-scope `is_confirmed_for` view returned `true` when called through GenLayerJS with typed arguments.
+
+## Historical / superseded v0.1.0 deployment
+
+The first deployment [`0xC85F766E74c77638E70859a417d01b799726Eb7E`](https://explorer-studio.genlayer.com/address/0xC85F766E74c77638E70859a417d01b799726Eb7E), deployment transaction [`0x79eec415ef9e96903b211bab2fc35d672bd2d0a4d099c22f2a87ba4c82203bf5`](https://explorer-studio.genlayer.com/tx/0x79eec415ef9e96903b211bab2fc35d672bd2d0a4d099c22f2a87ba4c82203bf5), is historical. Its review transaction [`0xe2efe0ed00090b6dfb1018a8eb10be05c0b87ef9344764a533a720992d0b6742`](https://explorer-studio.genlayer.com/tx/0xe2efe0ed00090b6dfb1018a8eb10be05c0b87ef9344764a533a720992d0b6742) finalized but GenVM failed while encoding the four-positional-field `NoticeReviewed` event (`SystemError: 2: inval`), leaving the notice pending. v0.1.1 emits only three positional fields and moves `change_kind` into the event blob; the new live review finalized successfully.
+
+## Release gate for future source changes
 
 Use Python 3.12+, install the exact versions in `requirements.txt`, fetch the pinned GenVM validation artifact, and run from this project directory:
 
@@ -37,6 +47,6 @@ All commands must exit successfully; Direct Mode tests must execute rather than 
 
 ## Deployment and future live-evidence checklist
 
-For a future live notice demonstration, record the exact notice ID, proposer, artifact URLs and raw-byte hashes, proposal/review transactions, consensus results, and canonical stored outcome. Keep any future deployments clearly separate from this current release.
+For each future deployment, keep the current v0.1.1 evidence intact and clearly label older addresses historical. Record each live notice ID, proposer, artifact URLs and raw-byte hashes, proposal/review transactions, consensus results, and canonical stored outcome.
 
 No wallet or deployment credentials belong in this repository. A finalized deployment or semantic result must never be inferred from an EVM submission receipt alone; verify the Intelligent Contract transaction's GenLayer lifecycle/finality.
