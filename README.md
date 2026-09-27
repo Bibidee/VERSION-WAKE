@@ -67,7 +67,20 @@ genvm-lint check contracts/versionwake.py --json
 genvm-lint schema contracts/versionwake.py --output artifacts/versionwake.abi.json
 ```
 
-The preflight fails if a required tool, test, linter, or schema step is missing or failing. Tests live outside `contracts/`; only `contracts/versionwake.py` is deployable. A failed release gate means **do not freeze or deploy**; fix the root cause and rerun every gate. No deployment has been performed or claimed by this repository state.
+The preflight fails if a required tool, test, linter, or schema step is missing or failing. Tests live outside `contracts/`; only `contracts/versionwake.py` is deployable. A failed release gate means **do not freeze or deploy**; fix the root cause and rerun every gate.
+
+## Studionet deployment
+
+The frozen source at commit `d91ceba7f56c52722fa2769291700b3a5e444b12` was deployed to GenLayer Studionet. The deployment transaction finalized with `MAJORITY_AGREE` and the leader GenVM execution reported `SUCCESS`.
+
+- Contract: [`0xC85F766E74c77638E70859a417d01b799726Eb7E`](https://explorer-studio.genlayer.com/address/0xC85F766E74c77638E70859a417d01b799726Eb7E)
+- Deployment transaction: [`0x79eec415ef9e96903b211bab2fc35d672bd2d0a4d099c22f2a87ba4c82203bf5`](https://explorer-studio.genlayer.com/tx/0x79eec415ef9e96903b211bab2fc35d672bd2d0a4d099c22f2a87ba4c82203bf5)
+- Contract source SHA-256: `814ad05373d84d0d25575471ad063b441d1fdc09007509c1623c6c12361179ed`
+- Source parity: **verified byte-for-byte** using GenLayerJS `getContractCode()` (`gen_getContractCode`); local and retrieved source were both 17,399 bytes and had the same SHA-256.
+- `get_info()` returned name `Versionwake`, version `0.1.0`, maximum 512 notices, maximum artifact size 16,000 bytes, and minimum confidence 75.
+- Release gate: GitHub Actions run [36320944416](https://github.com/Bibidee/VERSION-WAKE/actions/runs/36320944416) passed; all 61 Direct Mode tests passed, followed by GenVM lint and schema generation.
+
+Deployment proves source availability and contract initialization only. No live notice submission, semantic review, or confirmed notice lifecycle is claimed yet.
 
 ## References
 
